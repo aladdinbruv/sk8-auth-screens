@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   TextInput,
-  Pressable,
   ImageBackground,
   ScrollView,
   KeyboardAvoidingView,
@@ -22,31 +21,98 @@ import Animated, {
   Easing,
   withSequence,
   withSpring,
-  interpolateColor,
 } from 'react-native-reanimated';
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+// Import custom components and hooks
+import AnimatedInput from '../../components/ui/AnimatedInput';
+import GradientButton from '../../components/ui/GradientButton';
+import SocialButton from '../../components/ui/SocialButton';
+import { useTheme } from '../../contexts/ThemeContext';
+import useForm from '../../hooks/useForm';
+import { isEmailValid, isPasswordValid, doPasswordsMatch, isNameValid } from '../../utils/validation';
+import { COLORS, FONTS, LAYOUT, SPACING, ANIMATION } from '../../constants/theme';
+import theme from '../../constants/theme';
+
+interface RegisterFormValues {
+  fullName: string;
+  email: string;
+  username: string;
+  password: string;
+  confirmPassword: string;
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const { isDark, colors } = useTheme();
+  const SHADOWS = theme.SHADOWS;
   
-  // Validation states
-  const [emailValid, setEmailValid] = useState(false);
-  const [passwordValid, setPasswordValid] = useState(false);
-  const [passwordsMatch, setPasswordsMatch] = useState(false);
-
+  // Refs for focusing inputs
+  const emailInputRef = useRef<TextInput>(null);
+  const usernameInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
+  
+  // Form handling with validation
+  const { 
+    formState, 
+    handleChange, 
+    handleBlur, 
+    validateForm, 
+    isValid,
+    setError 
+  } = useForm<RegisterFormValues>(
+    {
+      fullName: '',
+      email: '',
+      username: '',
+      password: '',
+      confirmPassword: '',
+    },
+    {
+      fullName: {
+        required: true,
+        validate: isNameValid,
+        errorMessage: 'Please enter a valid name',
+      },
+      email: {
+        required: true,
+        validate: isEmailValid,
+        errorMessage: 'Please enter a valid email address',
+      },
+      username: {
+        required: true,
+        validate: (value) => value.length >= 3,
+        errorMessage: 'Username must be at least 3 characters',
+      },
+      password: {
+        required: true,
+        validate: isPasswordValid,
+        errorMessage: 'Password must be at least 6 characters',
+      },
+      confirmPassword: {
+        required: true,
+        validate: (value) => value.length >= 6,
+        errorMessage: 'Please confirm your password',
+      },
+    },
+    true, // Validate on change
+    300 // Debounce time
+  );
+  
+  // Validate that passwords match
+  useEffect(() => {
+    if (formState.password.value && formState.confirmPassword.value) {
+      const passwordsMatch = formState.password.value === formState.confirmPassword.value;
+      setError('confirmPassword', passwordsMatch ? '' : 'Passwords do not match');
+    }
+  }, [formState.password.value, formState.confirmPassword.value]);
+  
   // Animation values
   const headerOpacity = useSharedValue(0);
   const formOpacity = useSharedValue(0);
-  const buttonScale = useSharedValue(1);
-  const emailBorderColor = useSharedValue(0);
-  const passwordBorderColor = useSharedValue(0);
-  const confirmBorderColor = useSharedValue(0);
+  const socialOpacity = useSharedValue(0);
   
   // Load custom fonts
   const [fontsLoaded] = useFonts({
@@ -56,50 +122,33 @@ export default function RegisterScreen() {
   });
 
   useEffect(() => {
-    // Animations for screen elements
-    headerOpacity.value = withTiming(1, { duration: 600 });
-    formOpacity.value = withTiming(1, { 
-      duration: 800,
-      easing: Easing.out(Easing.cubic)
-    });
+    // Staggered animations
+    setTimeout(() => {
+      // Animate header with bounce
+      headerOpacity.value = withSequence(
+        withTiming(1, { duration: ANIMATION.duration.slow }),
+        withSpring(1)
+      );
+      
+      // Fade in form elements with a slide up
+      setTimeout(() => {
+        formOpacity.value = withTiming(1, { 
+          duration: ANIMATION.duration.extraSlow,
+          easing: Easing.out(Easing.cubic)
+        });
+      }, 300);
+      
+      // Fade in social buttons last
+      setTimeout(() => {
+        socialOpacity.value = withTiming(1, { 
+          duration: ANIMATION.duration.extraSlow,
+          easing: Easing.out(Easing.cubic)
+        });
+      }, 600);
+    }, 100);
   }, []);
 
-  // Validate email
-  useEffect(() => {
-    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    setEmailValid(isValid);
-    
-    if (email) {
-      emailBorderColor.value = withTiming(isValid ? 1 : 2, { duration: 300 });
-    } else {
-      emailBorderColor.value = withTiming(0, { duration: 300 });
-    }
-  }, [email]);
-
-  // Validate password
-  useEffect(() => {
-    const isValid = password.length >= 6;
-    setPasswordValid(isValid);
-    
-    if (password) {
-      passwordBorderColor.value = withTiming(isValid ? 1 : 2, { duration: 300 });
-    } else {
-      passwordBorderColor.value = withTiming(0, { duration: 300 });
-    }
-  }, [password]);
-
-  // Validate passwords match
-  useEffect(() => {
-    const doMatch = password === confirmPassword && password.length > 0;
-    setPasswordsMatch(doMatch);
-    
-    if (confirmPassword) {
-      confirmBorderColor.value = withTiming(doMatch ? 1 : 2, { duration: 300 });
-    } else {
-      confirmBorderColor.value = withTiming(0, { duration: 300 });
-    }
-  }, [password, confirmPassword]);
-
+  // Animated styles
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: headerOpacity.value,
@@ -113,67 +162,33 @@ export default function RegisterScreen() {
       transform: [{ translateY: (1 - formOpacity.value) * 50 }]
     };
   });
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => {
+  
+  const socialAnimatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: buttonScale.value }]
+      opacity: socialOpacity.value,
+      transform: [{ translateY: (1 - socialOpacity.value) * 30 }]
     };
   });
 
-  const emailContainerStyle = useAnimatedStyle(() => {
-    const borderColor = interpolateColor(
-      emailBorderColor.value,
-      [0, 1, 2],
-      ['rgba(255, 255, 255, 0.15)', '#1AE92F', '#FF3B55']
-    );
-    
-    return {
-      borderColor
-    };
-  });
-
-  const passwordContainerStyle = useAnimatedStyle(() => {
-    const borderColor = interpolateColor(
-      passwordBorderColor.value,
-      [0, 1, 2],
-      ['rgba(255, 255, 255, 0.15)', '#1AE92F', '#FF3B55']
-    );
-    
-    return {
-      borderColor
-    };
-  });
-
-  const confirmContainerStyle = useAnimatedStyle(() => {
-    const borderColor = interpolateColor(
-      confirmBorderColor.value,
-      [0, 1, 2],
-      ['rgba(255, 255, 255, 0.15)', '#1AE92F', '#FF3B55']
-    );
-    
-    return {
-      borderColor
-    };
-  });
-
-  const handlePressIn = () => {
-    buttonScale.value = withTiming(0.95, { duration: 100 });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const handlePressOut = () => {
-    buttonScale.value = withTiming(1, { duration: 200 });
-  };
-
+  // Handle register
   const handleRegister = () => {
-    if (emailValid && passwordValid && passwordsMatch && fullName && username) {
+    const isFormValid = validateForm();
+    
+    if (isFormValid) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      console.log('Registration attempt');
+      console.log('Registration attempt with:', formState);
       // Navigate to main app or verification screen
       // router.replace('/(tabs)');
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
+  };
+  
+  // Handle social signup
+  const handleSocialSignup = (provider: string) => {
+    console.log(`Signup with ${provider}`);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Implement OAuth logic here
   };
 
   if (!fontsLoaded) {
@@ -199,115 +214,134 @@ export default function RegisterScreen() {
             <ScrollView 
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
               <Animated.View style={[styles.headerContainer, headerAnimatedStyle]}>
-                <FontAwesome5 name="fire" size={32} color="#FF47D2" style={styles.headerIcon} />
+                <FontAwesome5 name="fire" size={32} color={colors.primaryPink} style={styles.headerIcon} />
                 <Text style={styles.headerText}>Join the Crew</Text>
               </Animated.View>
               
               <Animated.View style={[styles.formContainer, formAnimatedStyle]}>
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="user-alt" size={16} color="#FF47D2" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Full Name"
-                    placeholderTextColor="#999"
-                    onChangeText={setFullName}
-                  />
+                <AnimatedInput
+                  icon="user-alt"
+                  iconColor={colors.primaryPink}
+                  placeholder="Full Name"
+                  value={formState.fullName.value}
+                  onChangeText={(text) => handleChange('fullName', text)}
+                  onBlur={() => handleBlur('fullName')}
+                  validationState={formState.fullName.validationState}
+                  errorMessage={formState.fullName.error}
+                  returnKeyType="next"
+                  nextInputRef={emailInputRef}
+                  accessibilityLabel="Full name input"
+                  accessibilityHint="Enter your full name"
+                />
+                
+                <AnimatedInput
+                  ref={emailInputRef}
+                  icon="envelope"
+                  iconColor={colors.primaryPink}
+                  placeholder="Email"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={formState.email.value}
+                  onChangeText={(text) => handleChange('email', text)}
+                  onBlur={() => handleBlur('email')}
+                  validationState={formState.email.validationState}
+                  errorMessage={formState.email.error}
+                  returnKeyType="next"
+                  nextInputRef={usernameInputRef}
+                  accessibilityLabel="Email input"
+                  accessibilityHint="Enter your email address"
+                />
+                
+                <AnimatedInput
+                  ref={usernameInputRef}
+                  icon="user"
+                  iconColor={colors.primaryPink}
+                  placeholder="Username"
+                  autoCapitalize="none"
+                  value={formState.username.value}
+                  onChangeText={(text) => handleChange('username', text)}
+                  onBlur={() => handleBlur('username')}
+                  validationState={formState.username.validationState}
+                  errorMessage={formState.username.error}
+                  returnKeyType="next"
+                  nextInputRef={passwordInputRef}
+                  accessibilityLabel="Username input"
+                  accessibilityHint="Create a username"
+                />
+                
+                <AnimatedInput
+                  ref={passwordInputRef}
+                  icon="lock"
+                  iconColor={colors.primaryPink}
+                  placeholder="Password"
+                  isSecure
+                  value={formState.password.value}
+                  onChangeText={(text) => handleChange('password', text)}
+                  onBlur={() => handleBlur('password')}
+                  validationState={formState.password.validationState}
+                  errorMessage={formState.password.error}
+                  returnKeyType="next"
+                  nextInputRef={confirmPasswordInputRef}
+                  accessibilityLabel="Password input"
+                  accessibilityHint="Create a password"
+                />
+                
+                <AnimatedInput
+                  ref={confirmPasswordInputRef}
+                  icon="lock"
+                  iconColor={colors.primaryPink}
+                  placeholder="Confirm Password"
+                  isSecure
+                  value={formState.confirmPassword.value}
+                  onChangeText={(text) => handleChange('confirmPassword', text)}
+                  onBlur={() => handleBlur('confirmPassword')}
+                  validationState={formState.confirmPassword.validationState}
+                  errorMessage={formState.confirmPassword.error}
+                  returnKeyType="done"
+                  onSubmitEditing={handleRegister}
+                  accessibilityLabel="Confirm password input"
+                  accessibilityHint="Confirm your password"
+                />
+                
+                <GradientButton
+                  title="Create Account"
+                  onPress={handleRegister}
+                  colors={colors.gradientPink}
+                  style={styles.registerButton}
+                  disabled={!isValid}
+                  accessibilityLabel="Create account button"
+                  accessibilityHint="Tap to create your account"
+                />
+                
+                <View style={styles.dividerContainer}>
+                  <View style={styles.divider} />
+                  <Text style={styles.dividerText}>OR</Text>
+                  <View style={styles.divider} />
                 </View>
+              </Animated.View>
+              
+              <Animated.View style={[styles.socialContainer, socialAnimatedStyle]}>
+                <SocialButton
+                  provider="google"
+                  onPress={() => handleSocialSignup('google')}
+                  style={styles.socialButton}
+                />
+                <SocialButton
+                  provider="apple"
+                  onPress={() => handleSocialSignup('apple')}
+                  style={styles.socialButton}
+                />
                 
-                <Animated.View style={[styles.inputContainer, emailContainerStyle]}>
-                  <FontAwesome5 name="envelope" size={16} color="#FF47D2" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email"
-                    placeholderTextColor="#999"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    onChangeText={setEmail}
-                  />
-                  {email ? (
-                    <FontAwesome5 
-                      name={emailValid ? "check-circle" : "exclamation-circle"} 
-                      size={18} 
-                      color={emailValid ? "#1AE92F" : "#FF3B55"} 
-                    />
-                  ) : null}
-                </Animated.View>
-                
-                <View style={styles.inputContainer}>
-                  <FontAwesome5 name="user" size={16} color="#FF47D2" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Username"
-                    placeholderTextColor="#999"
-                    autoCapitalize="none"
-                    onChangeText={setUsername}
-                  />
-                </View>
-                
-                <Animated.View style={[styles.inputContainer, passwordContainerStyle]}>
-                  <FontAwesome5 name="lock" size={16} color="#FF47D2" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Password"
-                    placeholderTextColor="#999"
-                    secureTextEntry
-                    onChangeText={setPassword}
-                  />
-                  {password ? (
-                    <FontAwesome5 
-                      name={passwordValid ? "check-circle" : "exclamation-circle"} 
-                      size={18} 
-                      color={passwordValid ? "#1AE92F" : "#FF3B55"} 
-                    />
-                  ) : null}
-                </Animated.View>
-                
-                <Animated.View style={[styles.inputContainer, confirmContainerStyle]}>
-                  <FontAwesome5 name="lock" size={16} color="#FF47D2" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirm Password"
-                    placeholderTextColor="#999"
-                    secureTextEntry
-                    onChangeText={setConfirmPassword}
-                  />
-                  {confirmPassword ? (
-                    <FontAwesome5 
-                      name={passwordsMatch ? "check-circle" : "exclamation-circle"} 
-                      size={18} 
-                      color={passwordsMatch ? "#1AE92F" : "#FF3B55"} 
-                    />
-                  ) : null}
-                </Animated.View>
-                
-                <Animated.View style={[styles.buttonContainer, buttonAnimatedStyle]}>
-                  <Pressable
-                    style={styles.registerButton}
-                    onPressIn={handlePressIn}
-                    onPressOut={handlePressOut}
-                    onPress={handleRegister}
-                  >
-                    <LinearGradient
-                      colors={['#FF47D2', '#FF2876']}
-                      start={[0, 0]}
-                      end={[1, 0]}
-                      style={styles.buttonGradient}
-                    >
-                      <Text style={styles.registerButtonText}>Sign Up</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </Animated.View>
-                
-                <View style={styles.loginLinkContainer}>
-                  <Text style={styles.loginText}>Already part of the crew?</Text>
-                  <Link href="/auth/login" asChild>
-                    <Pressable>
-                      <Text style={styles.loginLink}>Login</Text>
-                    </Pressable>
-                  </Link>
-                </View>
+              </Animated.View>
+              
+              <Animated.View style={[styles.footerContainer, socialAnimatedStyle]}>
+                <Text style={styles.footerText}>Already have an account?</Text>
+                <Link href="/auth/login" style={styles.linkText}>
+                  Log In
+                </Link>
               </Animated.View>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -320,107 +354,77 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: '#000',
   },
   backgroundImage: {
     flex: 1,
     width: '100%',
-    height: '100%',
   },
   gradient: {
     flex: 1,
-    width: '100%',
-    height: '100%',
   },
   container: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
+    paddingHorizontal: SPACING.l,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xxl,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 30,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 15,
+    marginBottom: SPACING.xl,
   },
   headerIcon: {
-    marginRight: 5,
+    marginBottom: SPACING.s,
   },
   headerText: {
-    fontFamily: 'Bangers',
-    fontSize: 40,
+    fontFamily: FONTS.bangers,
+    fontSize: FONTS.h2,
     color: '#FFF',
-    textShadowColor: 'rgba(255, 71, 210, 0.75)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 10,
+    textAlign: 'center',
   },
   formContainer: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    marginBottom: 16,
-    height: 55,
-    paddingHorizontal: 15,
-  },
-  inputIcon: {
-    marginRight: 15,
-  },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    fontFamily: 'Roboto',
-    fontSize: 16,
-  },
-  buttonContainer: {
-    marginTop: 10,
-    marginBottom: 20,
-    shadowColor: '#FF47D2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginBottom: SPACING.l,
   },
   registerButton: {
-    borderRadius: 30,
-    overflow: 'hidden',
-    height: 55,
+    marginTop: SPACING.m,
   },
-  buttonGradient: {
-    flex: 1,
-    justifyContent: 'center',
+  dividerContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    marginVertical: SPACING.l,
   },
-  registerButtonText: {
-    fontFamily: 'Roboto-Bold',
-    fontSize: 18,
-    color: '#FFF',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
-  loginLinkContainer: {
+  dividerText: {
+    paddingHorizontal: SPACING.m,
+    color: '#CCCCCC',
+    fontSize: FONTS.caption,
+  },
+  socialContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 5,
+    marginBottom: SPACING.xl,
   },
-  loginText: {
-    fontFamily: 'Roboto',
-    color: '#CCC',
+  socialButton: {
+    marginHorizontal: SPACING.xs,
   },
-  loginLink: {
-    fontFamily: 'Roboto-Bold',
+  footerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#CCCCCC',
+    marginRight: SPACING.xs,
+  },
+  linkText: {
     color: '#FF47D2',
+    fontFamily: FONTS.robotoBold,
   },
 }); 

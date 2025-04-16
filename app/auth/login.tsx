@@ -1,15 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  TextInput,
-  Pressable,
   ImageBackground,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  TextInput,
+  ScrollView,
+  ViewStyle,
+  TextStyle,
+  ImageStyle,
+  StyleProp,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -26,17 +29,63 @@ import Animated, {
 import { FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-const { width, height } = Dimensions.get('window');
+// Import custom components and hooks
+import AnimatedInput from '../../components/ui/AnimatedInput';
+import GradientButton from '../../components/ui/GradientButton';
+import SocialButton from '../../components/ui/SocialButton';
+import { useTheme } from '../../contexts/ThemeContext';
+import useForm from '../../hooks/useForm';
+import { isEmailValid, isPasswordValid } from '../../utils/validation';
+import { COLORS, FONTS, LAYOUT, SPACING, ANIMATION } from '../../constants/theme';
+import theme from '../../constants/theme';
 
-export default function LoginScreen() {
+interface LoginFormValues {
+  username: string;
+  password: string;
+}
+
+const LoginScreen = () => {
+  // Use SHADOWS from theme import
+  const SHADOWS = theme.SHADOWS;
+  
   const router = useRouter();
-  const username = useSharedValue('');
-  const password = useSharedValue('');
+  const { isDark, colors } = useTheme();
+  
+  // Refs for focusing inputs
+  const passwordInputRef = useRef<TextInput>(null);
+  
+  // Form handling with validation
+  const { 
+    formState, 
+    handleChange, 
+    handleBlur, 
+    validateForm, 
+    isValid 
+  } = useForm<LoginFormValues>(
+    {
+      username: '',
+      password: '',
+    },
+    {
+      username: {
+        required: true,
+        validate: (value) => value.length >= 3,
+        errorMessage: 'Username must be at least 3 characters',
+      },
+      password: {
+        required: true,
+        validate: isPasswordValid,
+        errorMessage: 'Password must be at least 6 characters',
+      },
+    },
+    true, // Validate on change
+    300 // Debounce time
+  );
   
   // Animation values
   const logoScale = useSharedValue(0);
   const formOpacity = useSharedValue(0);
-  const buttonScale = useSharedValue(1);
+  const socialOpacity = useSharedValue(0);
   
   // Load custom fonts
   const [fontsLoaded] = useFonts({
@@ -46,19 +95,33 @@ export default function LoginScreen() {
   });
 
   useEffect(() => {
-    // Animate logo on mount
-    logoScale.value = withSequence(
-      withTiming(1.2, { duration: 500 }),
-      withSpring(1)
-    );
-    
-    // Fade in form elements
-    formOpacity.value = withTiming(1, { 
-      duration: 800,
-      easing: Easing.out(Easing.cubic)
-    });
+    // Staggered animations
+    setTimeout(() => {
+      // Animate logo with bounce
+      logoScale.value = withSequence(
+        withTiming(ANIMATION.scale.emphasis, { duration: ANIMATION.duration.slow }),
+        withSpring(ANIMATION.scale.normal)
+      );
+      
+      // Fade in form elements with a slide up
+      setTimeout(() => {
+        formOpacity.value = withTiming(1, { 
+          duration: ANIMATION.duration.extraSlow,
+          easing: Easing.out(Easing.cubic)
+        });
+      }, 300);
+      
+      // Fade in social buttons last
+      setTimeout(() => {
+        socialOpacity.value = withTiming(1, { 
+          duration: ANIMATION.duration.extraSlow,
+          easing: Easing.out(Easing.cubic)
+        });
+      }, 600);
+    }, 100);
   }, []);
 
+  // Animated styles
   const logoAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: logoScale.value }]
@@ -71,28 +134,33 @@ export default function LoginScreen() {
       transform: [{ translateY: (1 - formOpacity.value) * 50 }]
     };
   });
-
-  const buttonAnimatedStyle = useAnimatedStyle(() => {
+  
+  const socialAnimatedStyle = useAnimatedStyle(() => {
     return {
-      transform: [{ scale: buttonScale.value }]
+      opacity: socialOpacity.value,
+      transform: [{ translateY: (1 - socialOpacity.value) * 30 }]
     };
   });
 
-  const handlePressIn = () => {
-    buttonScale.value = withTiming(0.95, { duration: 100 });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const handlePressOut = () => {
-    buttonScale.value = withTiming(1, { duration: 200 });
-  };
-
+  // Handle login
   const handleLogin = () => {
+    const isFormValid = validateForm();
+    
+    if (isFormValid) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      console.log('Login attempt with:', formState.username.value, formState.password.value);
+      // Navigate to main app
+      // router.replace('/(tabs)');
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+  
+  // Handle social login
+  const handleSocialLogin = (provider: string) => {
+    console.log(`Login with ${provider}`);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Add login logic here
-    console.log('Login attempt');
-    // Navigate to main app
-    // router.replace('/(tabs)');
+    // Implement OAuth logic here
   };
 
   if (!fontsLoaded) {
@@ -107,77 +175,123 @@ export default function LoginScreen() {
         resizeMode="cover"
       >
         <LinearGradient
-          colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.85)']}
+          colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.4)']}
           style={styles.gradient}
         >
-          <StatusBar style="light" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
           >
-            <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-              <Text style={styles.appName}>SK8 </Text>
-              <FontAwesome5 name="faSnowboarding" size={42} color="#00E5FF" />
-            </Animated.View>
-            
-            <Animated.View style={[styles.formContainer, formAnimatedStyle]}>
-              <View style={styles.inputContainer}>
-                <FontAwesome5 name="user" size={18} color="#00E5FF" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Username"
-                  placeholderTextColor="#999"
-                  onChangeText={(text) => username.value = text}
-                  autoCapitalize="none"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <FontAwesome5 name="lock" size={18} color="#00E5FF" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor="#999"
-                  secureTextEntry
-                  onChangeText={(text) => password.value = text}
-                />
-              </View>
-              
-              <Animated.View style={[styles.buttonContainer, buttonAnimatedStyle]}>
-                <Pressable
-                  style={styles.loginButton}
-                  onPressIn={handlePressIn}
-                  onPressOut={handlePressOut}
-                  onPress={handleLogin}
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Animated.View 
+                style={[styles.logoContainer, logoAnimatedStyle]}
+                accessibilityRole="header"
+              >
+                <Text 
+                  style={[styles.appName, { color: colors.text }]}
+                  accessibilityLabel="SK8 App Logo"
                 >
-                  <LinearGradient
-                    colors={['#00E5FF', '#00ADFF']}
-                    start={[0, 0]}
-                    end={[1, 0]}
-                    style={styles.buttonGradient}
-                  >
-                    <Text style={styles.loginButtonText}>Login</Text>
-                  </LinearGradient>
-                </Pressable>
+                  SK8
+                </Text>
+                <FontAwesome5 
+                  name="bolt" 
+                  size={42} 
+                  color={colors.primaryBlue} 
+                  accessibilityLabel="Lightning bolt icon"
+                />
               </Animated.View>
               
-              <Text style={styles.forgotPassword}>Forgot Password?</Text>
+              <Animated.View style={[styles.formContainer, formAnimatedStyle]}>
+                <AnimatedInput
+                  icon="user"
+                  iconColor={colors.primaryBlue}
+                  placeholder="Username"
+                  autoCapitalize="none"
+                  value={formState.username.value}
+                  onChangeText={(text) => handleChange('username', text)}
+                  onBlur={() => handleBlur('username')}
+                  validationState={formState.username.validationState}
+                  errorMessage={formState.username.error}
+                  returnKeyType="next"
+                  nextInputRef={passwordInputRef}
+                  accessibilityLabel="Username input"
+                  accessibilityHint="Enter your username"
+                />
+                
+                <AnimatedInput
+                  ref={passwordInputRef}
+                  icon="lock"
+                  iconColor={colors.primaryBlue}
+                  placeholder="Password"
+                  isSecure
+                  value={formState.password.value}
+                  onChangeText={(text) => handleChange('password', text)}
+                  onBlur={() => handleBlur('password')}
+                  validationState={formState.password.validationState}
+                  errorMessage={formState.password.error}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLogin}
+                  accessibilityLabel="Password input"
+                  accessibilityHint="Enter your password"
+                />
+                
+                <GradientButton
+                  title="Login"
+                  onPress={handleLogin}
+                  colors={colors.gradientBlue}
+                  style={styles.loginButton}
+                  disabled={!isValid}
+                  accessibilityLabel="Login button"
+                  accessibilityHint="Tap to login to your account"
+                />
+                
+                <Text style={[styles.forgotPassword, { color: colors.primaryBlue }]}>
+                  Forgot Password?
+                </Text>
+                
+                <View style={styles.orContainer}>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <Text style={[styles.orText, { color: colors.textSecondary }]}>OR</Text>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                </View>
+              </Animated.View>
               
-              <View style={styles.registerLinkContainer}>
-                <Text style={styles.registerText}>New to the park?</Text>
-                <Link href="/auth/register" asChild>
-                  <Pressable>
-                    <Text style={styles.registerLink}>Sign up</Text>
-                  </Pressable>
-                </Link>
-              </View>
-            </Animated.View>
+              <Animated.View style={[styles.socialContainer, socialAnimatedStyle]}>
+                <SocialButton
+                  provider="google"
+                  onPress={() => handleSocialLogin('Google')}
+                  style={styles.socialButton}
+                />
+                
+                <SocialButton
+                  provider="apple"
+                  onPress={() => handleSocialLogin('Apple')}
+                  style={styles.socialButton}
+                />
+                
+                <View style={styles.registerLinkContainer}>
+                  <Text style={[styles.registerText, { color: colors.textSecondary }]}>
+                    New to the park?
+                  </Text>
+                  <Link href="/auth/register" asChild>
+                    <Text style={[styles.registerLink, { color: colors.primaryBlue }]}>
+                      Sign up
+                    </Text>
+                  </Link>
+                </View>
+              </Animated.View>
+            </ScrollView>
           </KeyboardAvoidingView>
         </LinearGradient>
       </ImageBackground>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -195,20 +309,24 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
+    padding: SPACING.l,
+    paddingTop: SPACING.xxl * 2,
+    paddingBottom: SPACING.xxl,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: SPACING.xxl,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 15,
+    gap: SPACING.m,
   },
   appName: {
-    fontFamily: 'Bangers',
-    fontSize: 60,
-    color: '#FFF',
+    fontFamily: FONTS.bangers,
+    fontSize: FONTS.h1,
     textShadowColor: 'rgba(0, 229, 255, 0.75)',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 10,
@@ -218,70 +336,49 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: 'center',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    marginBottom: 16,
-    height: 60,
-    paddingHorizontal: 15,
-  },
-  inputIcon: {
-    marginRight: 15,
-  },
-  input: {
-    flex: 1,
-    color: '#FFF',
-    fontFamily: 'Roboto',
-    fontSize: 16,
-  },
-  buttonContainer: {
-    marginTop: 10,
-    marginBottom: 20,
-    shadowColor: '#00E5FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
   loginButton: {
-    borderRadius: 30,
-    overflow: 'hidden',
-    height: 55,
-  },
-  buttonGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  loginButtonText: {
-    fontFamily: 'Roboto-Bold',
-    fontSize: 18,
-    color: '#FFF',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginTop: SPACING.s,
   },
   forgotPassword: {
-    fontFamily: 'Roboto',
-    color: '#00E5FF',
+    fontFamily: FONTS.roboto,
     textAlign: 'center',
-    marginBottom: 20,
+    marginTop: SPACING.l,
+    fontSize: FONTS.body,
+  },
+  orContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: SPACING.xl,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  orText: {
+    fontFamily: FONTS.roboto,
+    marginHorizontal: SPACING.m,
+    fontSize: FONTS.caption,
+  },
+  socialContainer: {
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+  },
+  socialButton: {
+    marginBottom: SPACING.m,
   },
   registerLinkContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 5,
+    marginTop: SPACING.l,
+    gap: SPACING.xs,
   },
   registerText: {
-    fontFamily: 'Roboto',
-    color: '#CCC',
+    fontFamily: FONTS.roboto,
   },
   registerLink: {
-    fontFamily: 'Roboto-Bold',
-    color: '#00E5FF',
+    fontFamily: FONTS.robotoBold,
   },
-}); 
+});
+
+export default LoginScreen; 
