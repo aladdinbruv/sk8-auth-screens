@@ -1,50 +1,78 @@
-# Welcome to your Expo app 👋
+# SK8 Auth Screens
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A stylish skateboarding-themed authentication UI built with React Native and Expo.
 
-## Get started
+## Features
 
-1. Install dependencies
+- Modern, skateboarding-inspired UI design
+- Animated components using React Native Reanimated
+- Real-time form validation with visual feedback
+- Custom font integration
+- Haptic feedback for enhanced user experience
+- Smooth transitions and micro-interactions
 
-   ```bash
-   npm install
-   ```
+## Screens
 
-2. Start the app
+### Login Screen
+- Username and password fields with icon indicators
+- Animated logo and form elements
+- "Forgot Password?" option
+- Link to registration screen
+- Bold blue color scheme with gradient buttons
 
-   ```bash
-    npx expo start
-   ```
+### Registration Screen
+- Full registration form with fields for name, email, username, password
+- Real-time validation with color-coded feedback
+- Password strength and matching indicators
+- Link back to login screen
+- Vibrant pink color scheme with gradient buttons
 
-In the output, you'll find options to open the app in a
+## How to Push to GitHub
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+Since there might be authentication issues with direct GitHub commands, here's how to push this project manually:
 
 ```bash
-npm run reset-project
+# Create a GitHub repository at: https://github.com/new
+
+# Initialize Git if not already done
+git init
+
+# Add remote (replace USERNAME with your actual GitHub username)
+git remote add origin https://github.com/USERNAME/sk8-auth-screens.git
+
+# Add all files
+git add .
+
+# Commit
+git commit -m "Initial commit with skateboarding-themed auth screens"
+
+# Push to GitHub
+git push -u origin main
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Dependencies
 
-## Learn more
+- React Native
+- Expo
+- React Navigation
+- Expo Router
+- React Native Reanimated
+- Expo Linear Gradient
+- Expo Haptics
+- Font Awesome icons
 
-To learn more about developing your project with Expo, look at the following resources:
+## Installation
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+# Clone the repository
+git clone https://github.com/your-username/sk8-auth-screens.git
 
-## Join the community
+# Navigate to the project directory
+cd sk8-auth-screens
 
-Join our community of developers creating universal apps.
+# Install dependencies
+npm install
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# Start the development server
+npm start
+```

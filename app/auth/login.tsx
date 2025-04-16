@@ -116,8 +116,8 @@ export default function LoginScreen() {
             style={styles.container}
           >
             <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-              <Text style={styles.appName}>SK8</Text>
-              <FontAwesome5 name="bolt" size={42} color="#00E5FF" />
+              <Text style={styles.appName}>SK8 </Text>
+              <FontAwesome5 name="faSnowboarding" size={42} color="#00E5FF" />
             </Animated.View>
             
             <Animated.View style={[styles.formContainer, formAnimatedStyle]}>
