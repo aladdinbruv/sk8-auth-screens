@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -38,9 +38,10 @@ import useForm from '../../hooks/useForm';
 import { isEmailValid, isPasswordValid } from '../../utils/validation';
 import { COLORS, FONTS, LAYOUT, SPACING, ANIMATION } from '../../constants/theme';
 import theme from '../../constants/theme';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginFormValues {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -50,6 +51,8 @@ const LoginScreen = () => {
   
   const router = useRouter();
   const { isDark, colors } = useTheme();
+  const { login } = useAuth();
+  const [errorMessage, setErrorMessage] = useState<string>('');
   
   // Refs for focusing inputs
   const passwordInputRef = useRef<TextInput>(null);
@@ -63,14 +66,14 @@ const LoginScreen = () => {
     isValid 
   } = useForm<LoginFormValues>(
     {
-      username: '',
+      email: '',
       password: '',
     },
     {
-      username: {
+      email: {
         required: true,
-        validate: (value) => value.length >= 3,
-        errorMessage: 'Username must be at least 3 characters',
+        validate: isEmailValid,
+        errorMessage: 'Please enter a valid email address',
       },
       password: {
         required: true,
@@ -143,16 +146,35 @@ const LoginScreen = () => {
   });
 
   // Handle login
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const isFormValid = validateForm();
+    setErrorMessage(''); // Clear previous errors
     
     if (isFormValid) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      console.log('Login attempt with:', formState.username.value, formState.password.value);
-      // Navigate to main app
-      // router.replace('/(tabs)');
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Call the login method from auth context
+        const result = await login(formState.email.value, formState.password.value);
+        
+        if (result.success) {
+          // If login is successful, the AuthProvider will update isAuthenticated
+          // And the app/index.tsx will handle the redirect to tabs
+          console.log('Login successful');
+        } else {
+          // Show error message
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          console.error('Login failed:', result.message);
+          setErrorMessage(result.message || 'Login failed');
+        }
+      } catch (error) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        console.error('Login error:', error);
+        setErrorMessage(error instanceof Error ? error.message : 'An error occurred');
+      }
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setErrorMessage('Please fix the errors in the form');
     }
   };
   
@@ -160,7 +182,8 @@ const LoginScreen = () => {
   const handleSocialLogin = (provider: string) => {
     console.log(`Login with ${provider}`);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Implement OAuth logic here
+    // Navigate to OAuth URL
+    // This would typically open a web browser for OAuth flow
   };
 
   if (!fontsLoaded) {
@@ -208,19 +231,20 @@ const LoginScreen = () => {
               
               <Animated.View style={[styles.formContainer, formAnimatedStyle]}>
                 <AnimatedInput
-                  icon="user"
+                  icon="envelope"
                   iconColor={colors.primaryBlue}
-                  placeholder="Username"
+                  placeholder="Email"
                   autoCapitalize="none"
-                  value={formState.username.value}
-                  onChangeText={(text) => handleChange('username', text)}
-                  onBlur={() => handleBlur('username')}
-                  validationState={formState.username.validationState}
-                  errorMessage={formState.username.error}
+                  keyboardType="email-address"
+                  value={formState.email.value}
+                  onChangeText={(text) => handleChange('email', text)}
+                  onBlur={() => handleBlur('email')}
+                  validationState={formState.email.validationState}
+                  errorMessage={formState.email.error}
                   returnKeyType="next"
                   nextInputRef={passwordInputRef}
-                  accessibilityLabel="Username input"
-                  accessibilityHint="Enter your username"
+                  accessibilityLabel="Email input"
+                  accessibilityHint="Enter your email address"
                 />
                 
                 <AnimatedInput
@@ -239,6 +263,14 @@ const LoginScreen = () => {
                   accessibilityLabel="Password input"
                   accessibilityHint="Enter your password"
                 />
+                
+                {errorMessage ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={[styles.errorText, { color: colors.error }]}>
+                      {errorMessage}
+                    </Text>
+                  </View>
+                ) : null}
                 
                 <GradientButton
                   title="Login"
@@ -378,6 +410,18 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     fontFamily: FONTS.robotoBold,
+  },
+  errorContainer: {
+    marginTop: SPACING.m,
+    marginBottom: SPACING.m,
+    padding: SPACING.s,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+  },
+  errorText: {
+    fontFamily: FONTS.roboto,
+    fontSize: FONTS.body,
+    textAlign: 'center',
   },
 });
 

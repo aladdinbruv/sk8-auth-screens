@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -34,6 +34,7 @@ import useForm from '../../hooks/useForm';
 import { isEmailValid, isPasswordValid, doPasswordsMatch, isNameValid } from '../../utils/validation';
 import { COLORS, FONTS, LAYOUT, SPACING, ANIMATION } from '../../constants/theme';
 import theme from '../../constants/theme';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface RegisterFormValues {
   fullName: string;
@@ -47,6 +48,8 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { isDark, colors } = useTheme();
   const SHADOWS = theme.SHADOWS;
+  const { register } = useAuth();
+  const [errorMessage, setErrorMessage] = useState<string>('');
   
   // Refs for focusing inputs
   const emailInputRef = useRef<TextInput>(null);
@@ -171,16 +174,68 @@ export default function RegisterScreen() {
   });
 
   // Handle register
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const isFormValid = validateForm();
+    setErrorMessage(''); // Clear previous errors
     
     if (isFormValid) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      console.log('Registration attempt with:', formState);
-      // Navigate to main app or verification screen
-      // router.replace('/(tabs)');
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        // Split fullName into firstName and lastName if provided
+        let firstName = '';
+        let lastName = 'User'; // Default lastName to avoid validation errors
+        
+        if (formState.fullName.value) {
+          const nameParts = formState.fullName.value.trim().split(' ');
+          firstName = nameParts[0] || '';
+          
+          if (nameParts.length > 1) {
+            lastName = nameParts.slice(1).join(' ');
+          }
+          // If only one name is provided, keep the default lastName
+        }
+        
+        // Create user data object matching backend expectations
+        const userData = {
+          email: formState.email.value,
+          password: formState.password.value,
+          displayName: formState.username.value, // Send username as displayName
+          firstName: firstName || formState.username.value, // Use username as fallback for firstName
+          lastName, // Now it always has a value
+        };
+        
+        console.log('Sending registration data:', userData);
+        
+        // Call register method from auth context
+        const result = await register(userData);
+        
+        if (result.success) {
+          console.log('Registration successful');
+          // Could show a success message or navigate to login/verification page
+          router.replace('/auth/login');
+        } else {
+          // Show error message
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          console.error('Registration failed:', result.message);
+          
+          // Handle different types of errors
+          if (result.errors && Object.keys(result.errors).length > 0) {
+            // If we have detailed validation errors, show them
+            const errorMessages = Object.values(result.errors).join('\n');
+            setErrorMessage(errorMessages || 'Validation failed');
+          } else {
+            setErrorMessage(result.message || 'Registration failed');
+          }
+        }
+      } catch (error) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        console.error('Registration error:', error);
+        setErrorMessage(error instanceof Error ? error.message : 'An error occurred');
+      }
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setErrorMessage('Please fix the errors in the form');
     }
   };
   
@@ -188,7 +243,8 @@ export default function RegisterScreen() {
   const handleSocialSignup = (provider: string) => {
     console.log(`Signup with ${provider}`);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    // Implement OAuth logic here
+    // Navigate to OAuth URL for signup
+    // This would typically open a web browser for OAuth flow
   };
 
   if (!fontsLoaded) {
@@ -305,6 +361,14 @@ export default function RegisterScreen() {
                   accessibilityLabel="Confirm password input"
                   accessibilityHint="Confirm your password"
                 />
+                
+                {errorMessage ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={[styles.errorText, { color: colors.error }]}>
+                      {errorMessage}
+                    </Text>
+                  </View>
+                ) : null}
                 
                 <GradientButton
                   title="Create Account"
@@ -426,5 +490,17 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#FF47D2',
     fontFamily: FONTS.robotoBold,
+  },
+  errorContainer: {
+    marginTop: SPACING.m,
+    marginBottom: SPACING.m,
+    padding: SPACING.s,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
+  },
+  errorText: {
+    fontFamily: FONTS.roboto,
+    fontSize: FONTS.body,
+    textAlign: 'center',
   },
 }); 
